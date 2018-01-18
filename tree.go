@@ -10,6 +10,7 @@ import (
 	"unicode/utf8"
 )
 
+// 返回较小的整数
 func min(a, b int) int {
 	if a <= b {
 		return a
@@ -17,6 +18,7 @@ func min(a, b int) int {
 	return b
 }
 
+// 返回参数数量。因为参数是包含:或者*的。所以数他们就可以。最多255个。
 func countParams(path string) uint8 {
 	var n uint
 	for i := 0; i < len(path); i++ {
@@ -31,33 +33,40 @@ func countParams(path string) uint8 {
 	return uint8(n)
 }
 
+// 为了省内存？因为node的类型就这么几种
 type nodeType uint8
 
 const (
+	// 不包含参数
 	static nodeType = iota // default
+	// 根节点
 	root
+	// 包含参数
 	param
+	// TODO: 暂时还不知道啥意思
 	catchAll
 )
 
 type node struct {
-	path      string
-	wildChild bool
-	nType     nodeType
-	maxParams uint8
-	indices   string
-	children  []*node
-	handle    Handle
-	priority  uint32
+	path      string   // 路径
+	wildChild bool     // 是否通配
+	nType     nodeType // 节点类型
+	maxParams uint8    // TODO: 暂时还不知道啥意思
+	indices   string   // TODO: 暂时还不知道啥意思
+	children  []*node  // 子节点
+	handle    Handle   // Handler
+	priority  uint32   // TODO: 暂时还不知道啥意思
 }
 
 // increments priority of the given child and reorders if necessary
+// 更改给定pos位置的优先级，然后决定是否移动位置。返回新的位置
 func (n *node) incrementChildPrio(pos int) int {
 	n.children[pos].priority++
-	prio := n.children[pos].priority
+	prio := n.children[pos].priority // 获取新的优先级
 
 	// adjust position (move to front)
 	newPos := pos
+	// 只要前面的优先级更低，就一直交换过去。除非到顶了。
 	for newPos > 0 && n.children[newPos-1].priority < prio {
 		// swap node positions
 		n.children[newPos-1], n.children[newPos] = n.children[newPos], n.children[newPos-1]
@@ -66,7 +75,9 @@ func (n *node) incrementChildPrio(pos int) int {
 	}
 
 	// build new index char string
+	// 如果移动了。
 	if newPos != pos {
+		// 最左边没有移动的+移动的+被交换的那一段+pos右边没动的那一段。不过还是不知道indices是啥意思
 		n.indices = n.indices[:newPos] + // unchanged prefix, might be empty
 			n.indices[pos:pos+1] + // the index char we move
 			n.indices[newPos:pos] + n.indices[pos+1:] // rest without char at 'pos'
@@ -79,14 +90,18 @@ func (n *node) incrementChildPrio(pos int) int {
 // Not concurrency-safe!
 func (n *node) addRoute(path string, handle Handle) {
 	fullPath := path
+	// TODO: 为什么要增加优先级？
 	n.priority++
+	// 统计出有多少个参数
 	numParams := countParams(path)
 
 	// non-empty tree
+	// 树非空
 	if len(n.path) > 0 || len(n.children) > 0 {
 	walk:
 		for {
 			// Update maxParams of the current node
+			// 为当前节点更新最大参数数量
 			if numParams > n.maxParams {
 				n.maxParams = numParams
 			}
@@ -94,6 +109,8 @@ func (n *node) addRoute(path string, handle Handle) {
 			// Find the longest common prefix.
 			// This also implies that the common prefix contains no ':' or '*'
 			// since the existing key can't contain those chars.
+			// 找到最长公共串。遍历一遍过去。
+			// TODO: 这里说已经存在的key不能包含 `:`或者 `*`。大概是在哪里做过什么处理吧。
 			i := 0
 			max := min(len(path), len(n.path))
 			for i < max && path[i] == n.path[i] {
@@ -101,6 +118,7 @@ func (n *node) addRoute(path string, handle Handle) {
 			}
 
 			// Split edge
+			// 如果i小于n.path说明要插入的节点比当前节点的路径短。分裂一个子节点出来。
 			if i < len(n.path) {
 				child := node{
 					path:      n.path[i:],
@@ -113,6 +131,7 @@ func (n *node) addRoute(path string, handle Handle) {
 				}
 
 				// Update maxParams (max of all children)
+				// 设置子节点的最大参数数量
 				for i := range child.children {
 					if child.children[i].maxParams > child.maxParams {
 						child.maxParams = child.children[i].maxParams
@@ -128,9 +147,12 @@ func (n *node) addRoute(path string, handle Handle) {
 			}
 
 			// Make new node a child of this node
+			// path比已经存在的更长
 			if i < len(path) {
+				// 取原path的后半段
 				path = path[i:]
 
+				// 如果有通配符的话
 				if n.wildChild {
 					n = n.children[0]
 					n.priority++
@@ -204,6 +226,7 @@ func (n *node) addRoute(path string, handle Handle) {
 			return
 		}
 	} else { // Empty tree
+		// 树为空
 		n.insertChild(numParams, path, fullPath, handle)
 		n.nType = root
 	}
