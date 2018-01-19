@@ -52,7 +52,7 @@ type node struct {
 	wildChild bool     // 是否通配
 	nType     nodeType // 节点类型
 	maxParams uint8    // 该节点下最多能有多少个参数
-	indices   string   // TODO: 暂时还不知道啥意思
+	indices   string   // 索引。所有孩子节点的首字母。好像是这样的
 	children  []*node  // 子节点
 	handle    Handle   // Handler
 	priority  uint32   // 优先级。https://github.com/julienschmidt/httprouter#how-does-it-work 子节点越多，优先级越高。
@@ -77,7 +77,7 @@ func (n *node) incrementChildPrio(pos int) int {
 	// build new index char string
 	// 如果移动了。
 	if newPos != pos {
-		// 最左边没有移动的+移动的+被交换的那一段+pos右边没动的那一段。不过还是不知道indices是啥意思
+		// 最左边没有移动的+移动的+被交换的那一段+pos右边没动的那一段
 		n.indices = n.indices[:newPos] + // unchanged prefix, might be empty
 			n.indices[pos:pos+1] + // the index char we move
 			n.indices[newPos:pos] + n.indices[pos+1:] // rest without char at 'pos'
@@ -388,6 +388,7 @@ walk: // outer loop for walking the tree
 				if !n.wildChild {
 					c := path[0]
 					for i := 0; i < len(n.indices); i++ {
+						// indices原来是做索引用。
 						if c == n.indices[i] {
 							n = n.children[i]
 							continue walk
