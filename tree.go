@@ -152,7 +152,7 @@ func (n *node) addRoute(path string, handle Handle) {
 
 			// Make new node a child of this node
 			// path比已经存在的更长。因为i是原来path和n.path中的最长公共部分。如果满足这个条件，说明
-			// 他们只有一部分是公共的。例如上面举的例子: `/user/hello` 和 `/use/this`
+			// 他们只有一部分是公共的。例如上面举的例子: `/user/hello` 和 `/use/this`。这里应该是处理 `/this` 这一段
 			if i < len(path) {
 				// 取原path的后半段
 				path = path[i:]
@@ -194,6 +194,7 @@ func (n *node) addRoute(path string, handle Handle) {
 				c := path[0]
 
 				// slash after param
+				// 如果n的类型是参数。path第一个字符是 `/`。而且n是第一次分裂出子节点。那就跳进去子节点？
 				if n.nType == param && c == '/' && len(n.children) == 1 {
 					n = n.children[0]
 					n.priority++
@@ -238,6 +239,20 @@ func (n *node) addRoute(path string, handle Handle) {
 	}
 }
 
+/*
+- 用offset记录已经处理的位置
+- 每次i for循环，走到下一个 `wildcard` 为止
+- end则走到 `/` 或者最后为止，然后：
+
+    - 把当前节点的path设置为path[offset:i]
+    - 新建一个子节点，设置类型为 param, maxParams设置为 numParams, wildChild设置为true，意思是子节点是通配。然后n指向child
+    - 如果end还没有打到最长长度，就把当前n的path设置为通配这一段, offset也对应更新一下，然后再新增加一个child
+    - 如果有多个参数，则开始进行下一个循环，否则就退出循环把最后一段的path[offset:]插到n.path里
+
+以 `/:user/:hello` 为例。
+
+第一个循环，offset为0，i为1，即走到第一个 `:`为止。end为6
+*/
 func (n *node) insertChild(numParams uint8, path, fullPath string, handle Handle) {
 	var offset int // already handled bytes of the path
 
