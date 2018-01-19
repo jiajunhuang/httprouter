@@ -51,15 +51,15 @@ type node struct {
 	path      string   // 路径
 	wildChild bool     // 是否通配
 	nType     nodeType // 节点类型
-	maxParams uint8    // TODO: 暂时还不知道啥意思
+	maxParams uint8    // 该节点下最多能有多少个参数
 	indices   string   // TODO: 暂时还不知道啥意思
 	children  []*node  // 子节点
 	handle    Handle   // Handler
-	priority  uint32   // TODO: 暂时还不知道啥意思
+	priority  uint32   // 优先级。https://github.com/julienschmidt/httprouter#how-does-it-work 子节点越多，优先级越高。
 }
 
 // increments priority of the given child and reorders if necessary
-// 更改给定pos位置的优先级，然后决定是否移动位置。返回新的位置
+// 更改给定pos位置的child的优先级，然后决定是否移动位置。返回新的位置
 func (n *node) incrementChildPrio(pos int) int {
 	n.children[pos].priority++
 	prio := n.children[pos].priority // 获取新的优先级
@@ -90,7 +90,7 @@ func (n *node) incrementChildPrio(pos int) int {
 // Not concurrency-safe!
 func (n *node) addRoute(path string, handle Handle) {
 	fullPath := path
-	// TODO: 为什么要增加优先级？
+	// 子节点又多了，所以要增加优先级
 	n.priority++
 	// 统计出有多少个参数
 	numParams := countParams(path)
@@ -112,13 +112,17 @@ func (n *node) addRoute(path string, handle Handle) {
 			// 找到最长公共串。遍历一遍过去。
 			// TODO: 这里说已经存在的key不能包含 `:`或者 `*`。大概是在哪里做过什么处理吧。
 			i := 0
+			// path和当前节点最多有多少个共同的字符
 			max := min(len(path), len(n.path))
 			for i < max && path[i] == n.path[i] {
 				i++
 			}
 
 			// Split edge
-			// 如果i小于n.path说明要插入的节点比当前节点的路径短。分裂一个子节点出来。
+			// 如果i小于n.path说明path当前节点的路径短。分裂出一个子节点，把原来属于n的属性全部搬过去。然后当前节点
+			// 保存为更短的。例如原来n的path是 `/user/hello`，现在插入 `/use/this`，那么 `/user/hello` 就要分裂成
+			// /use r/hello
+			//     /this
 			if i < len(n.path) {
 				child := node{
 					path:      n.path[i:],
@@ -147,13 +151,15 @@ func (n *node) addRoute(path string, handle Handle) {
 			}
 
 			// Make new node a child of this node
-			// path比已经存在的更长
+			// path比已经存在的更长。因为i是原来path和n.path中的最长公共部分。如果满足这个条件，说明
+			// 他们只有一部分是公共的。例如上面举的例子: `/user/hello` 和 `/use/this`
 			if i < len(path) {
 				// 取原path的后半段
 				path = path[i:]
 
-				// 如果有通配符的话
+				// 如果n原来是带通配符的话
 				if n.wildChild {
+					// 为啥切换到子节点？？？喵喵喵？
 					n = n.children[0]
 					n.priority++
 
