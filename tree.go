@@ -385,6 +385,7 @@ walk: // outer loop for walking the tree
 				// If this node does not have a wildcard (param or catchAll)
 				// child,  we can just look up the next child node and continue
 				// to walk down the tree
+				// 如果不是通配，就看下一个节点
 				if !n.wildChild {
 					c := path[0]
 					for i := 0; i < len(n.indices); i++ {
@@ -403,6 +404,7 @@ walk: // outer loop for walking the tree
 
 				}
 
+				// 是通配节点
 				// handle wildcard child
 				n = n.children[0]
 				switch n.nType {
