@@ -88,6 +88,9 @@ func (n *node) incrementChildPrio(pos int) int {
 
 // addRoute adds a node with the given handle to the path.
 // Not concurrency-safe!
+/*
+这个函数负责添加handler。检查是否有重复注册，是否有多个通配的URL重复。注意，通配URL只允许有一个存在，并且名字要相同才行。
+*/
 func (n *node) addRoute(path string, handle Handle) {
 	fullPath := path
 	// 子节点又多了，所以要增加优先级
@@ -121,7 +124,9 @@ func (n *node) addRoute(path string, handle Handle) {
 			// Split edge
 			// 如果i小于n.path说明path当前节点的路径短。分裂出一个子节点，把原来属于n的属性全部搬过去。然后当前节点
 			// 保存为更短的。例如原来n的path是 `/user/hello`，现在插入 `/use/this`，那么 `/user/hello` 就要分裂成
-			// /use r/hello
+			// /
+			//  use r/
+			//        hello
 			//     /this
 			if i < len(n.path) {
 				child := node{
@@ -159,7 +164,7 @@ func (n *node) addRoute(path string, handle Handle) {
 
 				// 如果n原来是带通配符的话
 				if n.wildChild {
-					// 为啥切换到子节点？？？喵喵喵？
+					// 如果是通配，则只允许一个通配子节点。跳进去
 					n = n.children[0]
 					n.priority++
 
