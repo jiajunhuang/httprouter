@@ -47,26 +47,32 @@ func CleanPath(p string) string {
 	// gets completely inlined (bufApp). So in contrast to the path package this
 	// loop has no expensive function calls (except 1x make)
 
+	// 到这里的时候，buf[0]一定是 `/`。而r则是下一个需要处理的数据，可能为1也可能为0
 	for r < n {
 		switch {
 		case p[r] == '/':
+			// 如果遇到 `/` 就跳过
 			// empty path element, trailing slash is added after the end
 			r++
 
 		case p[r] == '.' && r+1 == n:
+			// 最后一个是 `.`，跳过
 			trailing = true
 			r++
 
 		case p[r] == '.' && p[r+1] == '/':
+			// 接下来两个字符是 `./`
 			// . element
 			r++
 
 		case p[r] == '.' && p[r+1] == '.' && (r+2 == n || p[r+2] == '/'):
 			// .. element: remove to last /
+			// 遇到了 `..`
 			r += 2
 
 			if w > 1 {
 				// can backtrack
+				// 因为是 `..`，所以要回溯
 				w--
 
 				if buf == nil {
@@ -83,12 +89,14 @@ func CleanPath(p string) string {
 		default:
 			// real path element.
 			// add slash if needed
+			// 在 `switch` 最上面的情况里，该加 `/`，结果在这里处理了。原因是这样可以跳过n个 `/` 相连的情况
 			if w > 1 {
 				bufApp(&buf, p, w, '/')
 				w++
 			}
 
 			// copy element
+			// 一直复制到遇到下一个 `/`为止
 			for r < n && p[r] != '/' {
 				bufApp(&buf, p, w, p[r])
 				w++
