@@ -117,6 +117,7 @@ type Router struct {
 	// For example if /foo/ is requested but a route only exists for /foo, the
 	// client is redirected to /foo with http status code 301 for GET requests
 	// and 307 for all other request methods.
+	// 如果 `/foo/` 没匹配到到但是 `/foo` 可以，就重定向
 	RedirectTrailingSlash bool
 
 	// If enabled, the router tries to fix the current request path, if no
@@ -128,6 +129,7 @@ type Router struct {
 	// all other request methods.
 	// For example /FOO and /..//Foo could be redirected to /foo.
 	// RedirectTrailingSlash is independent of this option.
+	// 是否校正URL
 	RedirectFixedPath bool
 
 	// If enabled, the router checks if another method is allowed for the
@@ -136,14 +138,17 @@ type Router struct {
 	// and HTTP status code 405.
 	// If no other Method is allowed, the request is delegated to the NotFound
 	// handler.
+	// 是否响应为405. 如果为false，就响应404
 	HandleMethodNotAllowed bool
 
 	// If enabled, the router automatically replies to OPTIONS requests.
 	// Custom OPTIONS handlers take priority over automatic replies.
+	// 是否响应OPTIONS请求
 	HandleOPTIONS bool
 
 	// Configurable http.Handler which is called when no matching route is
 	// found. If it is not set, http.NotFound is used.
+	// 默认的未找到的Handler
 	NotFound http.Handler
 
 	// Configurable http.Handler which is called when a request
@@ -151,6 +156,7 @@ type Router struct {
 	// If it is not set, http.Error with http.StatusMethodNotAllowed is used.
 	// The "Allow" header with allowed request methods is set before the handler
 	// is called.
+	// 默认的处理405的Handler
 	MethodNotAllowed http.Handler
 
 	// Function to handle panics recovered from http handlers.
@@ -158,10 +164,12 @@ type Router struct {
 	// 500 (Internal Server Error).
 	// The handler can be used to keep your server from crashing because of
 	// unrecovered panics.
+	// 用来恢复500错误的Handler
 	PanicHandler func(http.ResponseWriter, *http.Request, interface{})
 }
 
 // Make sure the Router conforms with the http.Handler interface
+// 因为Go会进行类型检查。。。所以这行代码的目的大概就是这个吧
 var _ http.Handler = New()
 
 // New returns a new initialized Router.
@@ -219,10 +227,12 @@ func (r *Router) DELETE(path string, handle Handle) {
 // frequently used, non-standardized or custom methods (e.g. for internal
 // communication with a proxy).
 func (r *Router) Handle(method, path string, handle Handle) {
+	// 再次检查第一个字符是否为 `/`
 	if path[0] != '/' {
 		panic("path must begin with '/' in path '" + path + "'")
 	}
 
+	// 初始化trees
 	if r.trees == nil {
 		r.trees = make(map[string]*node)
 	}
@@ -238,6 +248,7 @@ func (r *Router) Handle(method, path string, handle Handle) {
 
 // Handler is an adapter which allows the usage of an http.Handler as a
 // request handle.
+// 转换器。兼容原生http.Handler
 func (r *Router) Handler(method, path string, handler http.Handler) {
 	r.Handle(method, path,
 		func(w http.ResponseWriter, req *http.Request, _ Params) {
@@ -248,6 +259,7 @@ func (r *Router) Handler(method, path string, handler http.Handler) {
 
 // HandlerFunc is an adapter which allows the usage of an http.HandlerFunc as a
 // request handle.
+// 转换器。兼容原生http.HandlerFunc
 func (r *Router) HandlerFunc(method, path string, handler http.HandlerFunc) {
 	r.Handler(method, path, handler)
 }
@@ -286,6 +298,7 @@ func (r *Router) recv(w http.ResponseWriter, req *http.Request) {
 // If the path was found, it returns the handle function and the path parameter
 // values. Otherwise the third return value indicates whether a redirection to
 // the same path with an extra / without the trailing slash should be performed.
+// 给method和path，把handler和params等搞出来
 func (r *Router) Lookup(method, path string) (Handle, Params, bool) {
 	if root := r.trees[method]; root != nil {
 		return root.getValue(path)
@@ -293,6 +306,7 @@ func (r *Router) Lookup(method, path string) (Handle, Params, bool) {
 	return nil, nil, false
 }
 
+// 把给定的path下，允许的method找出来。
 func (r *Router) allowed(path, reqMethod string) (allow string) {
 	if path == "*" { // server-wide
 		for method := range r.trees {
@@ -332,6 +346,7 @@ func (r *Router) allowed(path, reqMethod string) (allow string) {
 }
 
 // ServeHTTP makes the router implement the http.Handler interface.
+// 实现ServeHTTP方法。自制Golang web框架必备。。
 func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if r.PanicHandler != nil {
 		defer r.recv(w, req)
